@@ -17,34 +17,35 @@ from functions import (
 
 
 #todo mudar essa linha
-PROFILE_NAME = os.environ.get("AWS_PROFILE", "edn179")
+PROFILE_NAME = os.environ.get("AWS_PROFILE", "grupo06")
 
-INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:851614451056:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:851614451056:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0"
+# INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:851614451056:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
 
-def add_javascript():
-    """Adiciona JavaScript para melhorar a interação do usuário com o chat"""
-    js_code = """
-    <script>
-    // Fazer com que a tecla Enter submeta o formulário
-    document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(function() {
-            const textarea = document.querySelector('textarea');
-            if (textarea) {
-                textarea.addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        const sendButton = document.querySelector('button[data-testid="baseButton-secondary"]');
-                        if (sendButton) {
-                            sendButton.click();
-                        }
-                    }
-                });
-            }
-        }, 1000); // Pequeno atraso para garantir que os elementos foram carregados
-    });
-    </script>
-    """
-    st.components.v1.html(js_code, height=0)
+# def add_javascript():
+#     """Adiciona JavaScript para melhorar a interação do usuário com o chat"""
+#     js_code = """
+#     <script>
+#     // Fazer com que a tecla Enter submeta o formulário
+#     document.addEventListener('DOMContentLoaded', function() {
+#         setTimeout(function() {
+#             const textarea = document.querySelector('textarea');
+#             if (textarea) {
+#                 textarea.addEventListener('keydown', function(e) {
+#                     if (e.key === 'Enter' && !e.shiftKey) {
+#                         e.preventDefault();
+#                         const sendButton = document.querySelector('button[data-testid="baseButton-secondary"]');
+#                         if (sendButton) {
+#                             sendButton.click();
+#                         }
+#                     }
+#                 });
+#             }
+#         }, 1000); // Pequeno atraso para garantir que os elementos foram carregados
+#     });
+#     </script>
+#     """
+#     st.components.v1.html(js_code, height=0)
 
 #alterar
 st.set_page_config(
@@ -62,7 +63,7 @@ def preprocess_user_message(message):
     """
     return message
 
-def get_boto3_client(service_name, region_name='us-east-1', profile_name='edn174'):
+def get_boto3_client(service_name, region_name='us-east-1', profile_name='grupo06'):
     """
     Retorna um cliente do serviço AWS especificado.
     
@@ -97,12 +98,13 @@ def query_bedrock(message, session_id="", model_params=None, context="", convers
     #todo alterar os parametros do modelo
     if model_params is None:
         model_params = {
-            "temperature": 1.0,
-            "top_p": 0.85,
-            "top_k": 200,
+            "temperature": 0.6,
+            "top_p": 0.8,
+            "top_k": 50,
             "max_tokens": 800,
             "response_format": {"type": "text"}
         }
+
     
     bedrock_runtime = get_boto3_client('bedrock-runtime')
     
@@ -169,8 +171,8 @@ def check_password():
         
         #todo trocar o admin pelo nome de usuario
         #todo trocar o admin123 pela senha
-        if hmac.compare_digest(st.session_state["username"].strip(), "admin") and \
-        hmac.compare_digest(st.session_state["password"].strip(), "admin123"):
+        if hmac.compare_digest(st.session_state["username"].strip(), "cinemind") and \
+        hmac.compare_digest(st.session_state["password"].strip(), "edngrupo06"):
             print("DEBUG LOGIN: Autenticação bem-sucedida")
             st.session_state["password_correct"] = True
             st.session_state["auth_cookie"] = {
@@ -220,44 +222,52 @@ def check_password():
     if not st.session_state["password_correct"]:
         st.markdown("""
             <style>
-                .stTextInput > div > div > input {
-                    background-color: #f0f2f6;
-                    color: #000000;
+                /* Estilo para centralizar e limitar a largura */
+                .login-wrapper {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 60vh;
                 }
-                .login-form {
+                
+                /* Container do login */
+                .login-container {
+                    width: 100%;
                     max-width: 400px;
-                    margin: 0 auto;
                     padding: 2rem;
+                    border: 1px solid #ddd;
                     border-radius: 10px;
+                    background-color: #f9f9f9;
                     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                    background-color: white;
                 }
+                
                 .login-title {
-                    margin-bottom: 2rem;
                     text-align: center;
                     color: #4CAF50;
+                    margin-bottom: 2rem;
                 }
-                .login-button {
-                    width: 100%;
-                    margin-top: 1rem;
-                }
+                
+        
             </style>
         """, unsafe_allow_html=True)
-
-        # st.markdown('<div class="login-form">', unsafe_allow_html=True)
-        # col1, col2, col3 = st.columns([1, 1, 1])
-        # with col2:
-        #     st.image(logo_path, width=200)
-        st.markdown('<h1 class="login-title">Login</h1>', unsafe_allow_html=True)
         
-        st.text_input("Usuário", key="username")
-        st.text_input("Senha", type="password", key="password")
-        st.button("Entrar", on_click=password_entered, key="login-button")
+        # Cria 3 colunas para centralizar
+        col1, col2, col3 = st.columns([1, 3, 1])
         
-        if st.session_state["login_attempt"] and not st.session_state["password_correct"]:
-            st.error("Usuário ou senha incorretos")
+        with col2:
+            with st.container():
+                # st.markdown('<div class="login-container">', unsafe_allow_html=True)
+                st.markdown('<h1 class="login-title">Login</h1>', unsafe_allow_html=True)
+                
+                st.text_input("Usuário", key="username")
+                st.text_input("Senha", type="password", key="password")
+                st.button("Entrar", on_click=password_entered, key="login-button")
+                
+                if st.session_state.get("login_attempt", False) and not st.session_state["password_correct"]:
+                    st.error("Usuário ou senha incorretos")
+                
+                # st.markdown('</div>', unsafe_allow_html=True)
         
-        st.markdown('</div>', unsafe_allow_html=True)
         return False
     else:
         return True
@@ -352,6 +362,7 @@ def handle_message():
                     else:
                         combined_context = rag_context
                     
+                    # result = query_bedrock(user_message, current_session_id, context=combined_context, conversation_history=st.session_state.messages)
                     result = query_bedrock(user_message, current_session_id, context=combined_context, conversation_history=st.session_state.messages)
                 
                 if result:
@@ -387,11 +398,13 @@ def handle_message():
                 if 'file_uploader_key' not in st.session_state:
                     st.session_state.file_uploader_key = "file_to_send_0"
 
-
+            # Clear the input by triggering a rerun
             st.rerun()
 
-        else:
-            st.session_state.user_input = ""
+def handle_message_callback():
+    """Callback function to handle message sending"""
+    if st.session_state.user_input and st.session_state.user_input.strip():
+        handle_message()
 
 def add_javascript():
     """Adiciona JavaScript para melhorar a interação do usuário com o chat"""
@@ -488,6 +501,7 @@ def regenerate_message(index):
     status_placeholder.info("Regenerando resposta...")
     
     with st.spinner():
+        # result = query_bedrock(user_message, st.session_state.session_id, conversation_history=st.session_state.messages)
         result = query_bedrock(user_message, st.session_state.session_id, conversation_history=st.session_state.messages)
         
     if result:
@@ -825,6 +839,7 @@ def handle_message_with_input(user_input):
                 with st.spinner():
                     current_session_id = "" if is_first_message else st.session_state.session_id
                     rag_context = get_rag_context()
+                    # result = query_bedrock(user_input, current_session_id, context=rag_context, conversation_history=st.session_state.messages)
                     result = query_bedrock(user_input, current_session_id, context=rag_context, conversation_history=st.session_state.messages)
                 
                 if result:
@@ -934,7 +949,10 @@ if check_password():
                 if st.button("🗑️", key=f"delete_{idx}", help="Excluir conversa"):
                     delete_chat(idx)
     
-        use_rag = st.checkbox("Usar Contexto Adicional (RAG)", value=st.session_state.use_rag)
+    
+    #todo se for usar rag descomentar aqui
+        #use_rag = st.checkbox("Usar Contexto Adicional (RAG)", value=st.session_state.use_rag)
+        use_rag=False
         st.session_state.use_rag = use_rag
 
         if use_rag:
