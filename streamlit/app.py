@@ -17,7 +17,7 @@ from functions import (format_context, generate_chat_prompt,
 import streamlit as st
 
 #todo mudar essa linha
-PROFILE_NAME = os.environ.get("AWS_PROFILE", "grupo06")
+PROFILE_NAME = os.environ.get("AWS_PROFILE", "")
 
 INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:851614451056:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0"
 # INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:851614451056:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
@@ -40,7 +40,7 @@ def preprocess_user_message(message):
     """
     return message
 
-def get_boto3_client(service_name, region_name='us-east-1', profile_name='grupo06'):
+def get_boto3_client(service_name, region_name='us-east-1', profile_name=''):
     """
     Retorna um cliente do serviço AWS especificado.
     
