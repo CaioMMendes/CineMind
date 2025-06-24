@@ -22,30 +22,7 @@ PROFILE_NAME = os.environ.get("AWS_PROFILE", "grupo06")
 INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:851614451056:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0"
 # INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:851614451056:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
 
-# def add_javascript():
-#     """Adiciona JavaScript para melhorar a interação do usuário com o chat"""
-#     js_code = """
-#     <script>
-#     // Fazer com que a tecla Enter submeta o formulário
-#     document.addEventListener('DOMContentLoaded', function() {
-#         setTimeout(function() {
-#             const textarea = document.querySelector('textarea');
-#             if (textarea) {
-#                 textarea.addEventListener('keydown', function(e) {
-#                     if (e.key === 'Enter' && !e.shiftKey) {
-#                         e.preventDefault();
-#                         const sendButton = document.querySelector('button[data-testid="stBaseButton-secondary"]');
-#                         if (sendButton) {
-#                             sendButton.click();
-#                         }
-#                     }
-#                 });
-#             }
-#         }, 1000); // Pequeno atraso para garantir que os elementos foram carregados
-#     });
-#     </script>
-#     """
-#     st.components.v1.html(js_code, height=0)
+
 
 #alterar
 st.set_page_config(
@@ -302,174 +279,134 @@ def get_rag_context():
     
     return ""
 
+
+
+
+
+
 def handle_message():
     """Processa o envio de uma mensagem do usuário"""
-    if st.session_state.user_input.strip():
-        user_message = st.session_state.user_input.strip()
+    if not st.session_state.user_input or not st.session_state.user_input.strip():
+        return
         
-        current_input = user_message
+    user_message = st.session_state.user_input.strip()
+    
+    # Marcar para limpar na próxima execução
+    st.session_state.clear_input = True
+    
+    # Verificar duplicatas
+    is_duplicate = False
+    if len(st.session_state.messages) > 0:
+        last_messages = [m for m in st.session_state.messages if m["role"] == "user"]
+        if last_messages and last_messages[-1]["content"] == user_message:
+            is_duplicate = True
+    
+    if not is_duplicate:
+        timestamp = datetime.now().strftime("%H:%M")
         
-        is_duplicate = False
-        if len(st.session_state.messages) > 0:
-            last_messages = [m for m in st.session_state.messages if m["role"] == "user"]
-            if last_messages and last_messages[-1]["content"] == current_input:
-                is_duplicate = True
+        # Adicionar mensagem do usuário
+        st.session_state.messages.append({"role": "user", "content": user_message, "time": timestamp})
         
-        if not is_duplicate:
-            timestamp = datetime.now().strftime("%H:%M")
+        # Salvar no histórico
+        save_current_chat()
+        
+        is_first_message = len(st.session_state.messages) == 1
+        
+        with st.chat_message("assistant", avatar=logo_path):
+            typing_placeholder = st.empty()
+            typing_placeholder.markdown("_Digitando..._")
             
-            attached_file = st.session_state.get('file_to_send', None)
-            file_content = ""
-            file_info = ""
+            with st.spinner():
+                current_session_id = "" if is_first_message else st.session_state.session_id
+                rag_context = get_rag_context()
+                result = query_bedrock(user_message, current_session_id, context=rag_context, conversation_history=st.session_state.messages)
             
-            if attached_file is not None:
-                file_extension = attached_file.name.split('.')[-1].lower()
+            if result:
+                assistant_message = result.get('answer', 'Não foi possível obter uma resposta.')
                 
-                if file_extension == 'pdf':
-                    file_content = read_pdf_from_uploaded_file(attached_file)
-                elif file_extension == 'txt':
-                    file_content = read_txt_from_uploaded_file(attached_file)
-                elif file_extension in ['csv', 'xls', 'xlsx']:
-                    file_content = read_csv_from_uploaded_file(attached_file)
-                elif file_extension in ['doc', 'docx']:
-                    file_content = "Arquivo do Word anexado (processamento de conteúdo não disponível)"
+                if "sessionId" in result:
+                    new_session_id = result["sessionId"]
+                    st.session_state.session_id = new_session_id
+                    
+                    if st.session_state.current_chat_index < len(st.session_state.chat_history):
+                        st.session_state.chat_history[st.session_state.current_chat_index]["id"] = new_session_id
                 
-                file_info = f"\n[Arquivo anexado: {attached_file.name}]"
+                timestamp = datetime.now().strftime("%H:%M")
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": assistant_message, 
+                    "time": timestamp
+                })
                 
-                user_message_with_attachment = f"{user_message}{file_info}"
+                # Salvar no histórico
+                save_current_chat()
                 
-                st.session_state.messages.append({"role": "user", "content": user_message_with_attachment, "time": timestamp})
-            else:
-                st.session_state.messages.append({"role": "user", "content": user_message, "time": timestamp})
-            
-            is_first_message = len(st.session_state.messages) == 1
-            
-            with st.chat_message("assistant", avatar=logo_path):
-                typing_placeholder = st.empty()
-                typing_placeholder.markdown("_Digitando..._")
+                if is_first_message:
+                    new_title = extract_title_from_response(assistant_message)
+                    st.session_state.chat_title = new_title
+                    
+                    if st.session_state.current_chat_index < len(st.session_state.chat_history):
+                        st.session_state.chat_history[st.session_state.current_chat_index]["title"] = new_title
                 
-                with st.spinner():
-                    current_session_id = "" if is_first_message else st.session_state.session_id
-                    
-                    rag_context = get_rag_context()
-                    
-                    if file_content:
-                        file_context = format_context(file_content, f"Conteúdo do arquivo anexado ({attached_file.name})")
-                        if rag_context:
-                            combined_context = f"{rag_context}\n{file_context}"
-                        else:
-                            combined_context = file_context
-                    else:
-                        combined_context = rag_context
-                    
-                    # result = query_bedrock(user_message, current_session_id, context=combined_context, conversation_history=st.session_state.messages)
-                    result = query_bedrock(user_message, current_session_id, context=combined_context, conversation_history=st.session_state.messages)
-                
-                if result:
-                    assistant_message = result.get('answer', 'Não foi possível obter uma resposta.')
-                    
-                    if "sessionId" in result:
-                        new_session_id = result["sessionId"]
-                        print(f"DEBUG: API retornou sessionId: '{new_session_id}'")
-                        
-                        st.session_state.session_id = new_session_id
-                        print(f"DEBUG: Atualizando session_id para '{new_session_id}'")
-                        
-                        if st.session_state.current_chat_index < len(st.session_state.chat_history):
-                            st.session_state.chat_history[st.session_state.current_chat_index]["id"] = new_session_id
-                            print(f"DEBUG: Histórico atualizado com session_id '{new_session_id}'")
-                    
-                    timestamp = datetime.now().strftime("%H:%M")
-                    st.session_state.messages.append({
-                        "role": "assistant", 
-                        "content": assistant_message, 
-                        "time": timestamp
-                    })
-                    
-                    if is_first_message:
-                        new_title = extract_title_from_response(assistant_message)
-                        st.session_state.chat_title = new_title
-                        
-                        if st.session_state.current_chat_index < len(st.session_state.chat_history):
-                            st.session_state.chat_history[st.session_state.current_chat_index]["title"] = new_title
-                    
-                typing_placeholder.empty()
-                
-                if 'file_uploader_key' not in st.session_state:
-                    st.session_state.file_uploader_key = "file_to_send_0"
+            typing_placeholder.empty()
+        
+        st.rerun()
 
-            # Clear the input by triggering a rerun
-            st.rerun()
 
-def handle_message_callback():
-    """Callback function to handle message sending"""
-    if st.session_state.user_input and st.session_state.user_input.strip():
-        handle_message()
 
 def add_javascript():
     """Adiciona JavaScript para melhorar a interação do usuário com o chat"""
     js_code = """
     <script>
-    // Fazer com que a tecla Enter submeta o formulário
     document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(function() {
-    const observer = new MutationObserver(() => {
-    const textarea = document.querySelector('textarea');
-    const sendButton = document.querySelector('button[data-testid="stBaseButton-secondary"]');
-    console.log('asdasd',textarea,sendButton)
-    
-    if (textarea && sendButton) {
-        textarea.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendButton.click();
+        function setupEnterKeyListener() {
+            const textareas = document.querySelectorAll('textarea');
+            textareas.forEach(textarea => {
+                textarea.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        const sendButton = document.querySelector('button:contains("Enviar")') || 
+                                          document.querySelector('[data-testid*="button"]:contains("Enviar")');
+                        if (sendButton) {
+                            sendButton.click();
+                        }
+                    }
+                });
+            });
+        }
+        
+        // Setup inicial
+        setTimeout(setupEnterKeyListener, 1000);
+        
+        // Observer para re-setup quando a página muda
+        const observer = new MutationObserver(function(mutations) {
+            let shouldSetup = false;
+            mutations.forEach(function(mutation) {
+                if (mutation.addedNodes.length > 0) {
+                    shouldSetup = true;
+                }
+            });
+            if (shouldSetup) {
+                setTimeout(setupEnterKeyListener, 100);
             }
         });
-
-        observer.disconnect(); // para de observar após adicionar o listener
-    }
-});
-
-observer.observe(document.body, { childList: true, subtree: true });
-            
-
-        }, 1000); // Pequeno atraso para garantir que os elementos foram carregados
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
     });
     </script>
     """
     st.components.v1.html(js_code, height=0)
+    
+def save_current_chat():
+    """Salva a conversa atual no histórico"""
+    if st.session_state.current_chat_index < len(st.session_state.chat_history):
+        st.session_state.chat_history[st.session_state.current_chat_index]["messages"] = st.session_state.messages.copy()
+        st.session_state.chat_history[st.session_state.current_chat_index]["title"] = st.session_state.chat_title
+        st.session_state.chat_history[st.session_state.current_chat_index]["id"] = st.session_state.session_id
 
-
-
-#     st.components.v1.html("""
-# <script>
-# document.addEventListener('DOMContentLoaded', function () {
-#     const observer = new MutationObserver(() => {
-#         const textarea = document.querySelector('textarea');
-#         const sendButton = document.querySelector('button[data-testid="stBaseButton-secondary"]');
-#         console.log('asdasd',textarea, sendButton);
-
-#         if (textarea && sendButton) {
-#             textarea.addEventListener('keydown', function (e) {
-#                 if (e.key === 'Enter' && !e.shiftKey) {
-#                     e.preventDefault();
-#                     sendButton.click();
-#                 }
-#             });
-
-#             observer.disconnect();
-#         }
-#     });
-
-#     const body = document.body;
-#     if (body) {
-#         observer.observe(body, { childList: true, subtree: true });
-#     } else {
-#         console.error("document.body não está disponível.");
-#     }
-# });
-# </script>
-# """, height=0)
 
 def extract_title_from_response(response_text):
     """
@@ -590,9 +527,19 @@ def delete_chat(index):
         else:
             load_chat(st.session_state.current_chat_index)
 
+# def rename_chat():
+#     """Renomeia uma conversa existente"""
+#     if st.session_state.new_chat_title.strip():
+#         index = st.session_state.current_chat_index
+#         st.session_state.chat_history[index]["title"] = st.session_state.new_chat_title
+#         st.session_state.chat_title = st.session_state.new_chat_title
+        
+#         st.session_state.renaming = False
+#         st.rerun()
+
 def rename_chat():
     """Renomeia uma conversa existente"""
-    if st.session_state.new_chat_title.strip():
+    if hasattr(st.session_state, 'new_chat_title') and st.session_state.new_chat_title.strip():
         index = st.session_state.current_chat_index
         st.session_state.chat_history[index]["title"] = st.session_state.new_chat_title
         st.session_state.chat_title = st.session_state.new_chat_title
@@ -813,78 +760,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-def handle_message_if_content():
-    """Verifica se há conteúdo antes de enviar e processa a mensagem"""
-    if not hasattr(st.session_state, 'user_input'):
-        return
-        
-    if st.session_state.user_input and st.session_state.user_input.strip():
-        print(f"DEBUG: handle_message_if_content acionado com: '{st.session_state.user_input}'")
-        cleaned_input = st.session_state.user_input.strip()
-        
-        if cleaned_input and not cleaned_input.isspace():
-            temp_input = st.session_state.user_input
-            st.session_state.user_input = ""
-            handle_message_with_input(temp_input)
 
-def handle_message_with_input(user_input):
-    """Processa o envio de uma mensagem do usuário com input específico"""
-    if user_input.strip():
-        is_duplicate = False
-        if len(st.session_state.messages) > 0:
-            last_messages = [m for m in st.session_state.messages if m["role"] == "user"]
-            if last_messages and last_messages[-1]["content"] == user_input:
-                print(f"DEBUG: Mensagem duplicada detectada: '{user_input}'")
-                is_duplicate = True
-        
-        if not is_duplicate:
-            print(f"DEBUG: Enviando mensagem: '{user_input}'")
-            timestamp = datetime.now().strftime("%H:%M")
-            st.session_state.messages.append({"role": "user", "content": user_input, "time": timestamp})
-            
-            is_first_message = len(st.session_state.messages) == 1
-            
-            with st.chat_message("assistant", avatar=logo_path):
-                typing_placeholder = st.empty()
-                typing_placeholder.markdown("_Digitando..._")
-                
-                with st.spinner():
-                    current_session_id = "" if is_first_message else st.session_state.session_id
-                    rag_context = get_rag_context()
-                    # result = query_bedrock(user_input, current_session_id, context=rag_context, conversation_history=st.session_state.messages)
-                    result = query_bedrock(user_input, current_session_id, context=rag_context, conversation_history=st.session_state.messages)
-                
-                if result:
-                    assistant_message = result.get('answer', 'Não foi possível obter uma resposta.')
-                    
-                    if "sessionId" in result:
-                        new_session_id = result["sessionId"]
-                        print(f"DEBUG: API retornou sessionId: '{new_session_id}'")
-                        
-                        st.session_state.session_id = new_session_id
-                        print(f"DEBUG: Atualizando session_id para '{new_session_id}'")
-                        
-                        if st.session_state.current_chat_index < len(st.session_state.chat_history):
-                            st.session_state.chat_history[st.session_state.current_chat_index]["id"] = new_session_id
-                            print(f"DEBUG: Histórico atualizado com session_id '{new_session_id}'")
-                    
-                    timestamp = datetime.now().strftime("%H:%M")
-                    st.session_state.messages.append({
-                        "role": "assistant", 
-                        "content": assistant_message, 
-                        "time": timestamp
-                    })
-                    
-                    if is_first_message:
-                        new_title = extract_title_from_response(assistant_message)
-                        st.session_state.chat_title = new_title
-                        
-                        if st.session_state.current_chat_index < len(st.session_state.chat_history):
-                            st.session_state.chat_history[st.session_state.current_chat_index]["title"] = new_title
-                        
-                typing_placeholder.empty()
-            
-            st.rerun()
 
 if check_password():
     print("DEBUG AUTH: Verificando senha")
@@ -1021,24 +897,19 @@ if check_password():
         
         st.markdown("<div style='height: 120px;'></div>", unsafe_allow_html=True)
         
-        # st.markdown('<div class="input-container">', unsafe_allow_html=True)
-        
-        # st.markdown('<div class="input-container">', unsafe_allow_html=True)
 
         col1, col2 = st.columns([5,  1])
+        if st.session_state.get('clear_input', False):
+            st.session_state.user_input = ""
+            st.session_state.clear_input = False
 
         with col1:
             st.text_area("Mensagem", placeholder="Digite sua mensagem aqui...", key="user_input", 
                 height=200, label_visibility="collapsed")
 
-        # with col2:
-        #     file_to_send = st.file_uploader("Anexar arquivo", type=["pdf", "txt", "csv", "doc", "docx", "xls", "xlsx"], 
-        #                                 key="file_to_send", label_visibility="collapsed")
-        #     st.markdown('<div class="attach-icon" title="Anexar arquivo"><i class="fas fa-paperclip"></i></div>', unsafe_allow_html=True)
 
         with col2:
-            if st.button("Enviar", key="send_button", use_container_width=True):
-                if st.session_state.user_input and st.session_state.user_input.strip():
+                if st.button("Enviar", key="send_button", use_container_width=True):
                     handle_message()
         
         with messages_container:
