@@ -178,6 +178,10 @@ def invoke_bedrock_model(prompt, inference_profile_arn, model_params=None):
             "answer": f"Ocorreu um erro ao processar sua solicitação: {str(e)}. Por favor, tente novamente.",
             "sessionId": str(uuid.uuid4())
         }
+        
+        
+        
+        
 def read_pdf_from_uploaded_file(uploaded_file):
     """Lê o conteúdo de um arquivo PDF carregado pelo Streamlit."""
     try:
@@ -192,6 +196,10 @@ def read_pdf_from_uploaded_file(uploaded_file):
         return text
     except Exception as e:
         return f"Erro ao ler PDF: {str(e)}"
+    
+    
+    
+    
 
 def read_txt_from_uploaded_file(uploaded_file):
     """Lê o conteúdo de um arquivo TXT carregado pelo Streamlit."""
@@ -199,6 +207,10 @@ def read_txt_from_uploaded_file(uploaded_file):
         return uploaded_file.getvalue().decode("utf-8")
     except Exception as e:
         return f"Erro ao ler TXT: {str(e)}"
+    
+    
+    
+    
 
 def read_csv_from_uploaded_file(uploaded_file):
     """Lê o conteúdo de um arquivo CSV carregado pelo Streamlit."""

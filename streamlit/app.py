@@ -1,20 +1,20 @@
-import streamlit as st
-import requests
-import json
-import hmac
-import uuid
-import time
-import boto3
-from datetime import datetime
-import re
 import base64
+import hmac
+import json
 import os
-from functions import (
-    generate_chat_prompt, format_context, 
-    read_pdf_from_uploaded_file, read_txt_from_uploaded_file, read_csv_from_uploaded_file
-)
+import re
+import time
+import uuid
+from datetime import datetime
 
+import boto3
+import requests
+from functions import (format_context, generate_chat_prompt,
+                       read_csv_from_uploaded_file,
+                       read_pdf_from_uploaded_file,
+                       read_txt_from_uploaded_file)
 
+import streamlit as st
 
 #todo mudar essa linha
 PROFILE_NAME = os.environ.get("AWS_PROFILE", "grupo06")
@@ -34,7 +34,7 @@ INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:851614451056:inference-profil
 #                 textarea.addEventListener('keydown', function(e) {
 #                     if (e.key === 'Enter' && !e.shiftKey) {
 #                         e.preventDefault();
-#                         const sendButton = document.querySelector('button[data-testid="baseButton-secondary"]');
+#                         const sendButton = document.querySelector('button[data-testid="stBaseButton-secondary"]');
 #                         if (sendButton) {
 #                             sendButton.click();
 #                         }
@@ -413,51 +413,63 @@ def add_javascript():
     // Fazer com que a tecla Enter submeta o formulário
     document.addEventListener('DOMContentLoaded', function() {
         setTimeout(function() {
-            const textarea = document.querySelector('textarea');
-            if (textarea) {
-                textarea.addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        const sendButton = document.querySelector('button[data-testid="baseButton-secondary"]');
-                        if (sendButton) {
-                            sendButton.click();
-                        }
-                    }
-                });
+    const observer = new MutationObserver(() => {
+    const textarea = document.querySelector('textarea');
+    const sendButton = document.querySelector('button[data-testid="stBaseButton-secondary"]');
+    console.log('asdasd',textarea,sendButton)
+    
+    if (textarea && sendButton) {
+        textarea.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendButton.click();
             }
+        });
+
+        observer.disconnect(); // para de observar após adicionar o listener
+    }
+});
+
+observer.observe(document.body, { childList: true, subtree: true });
             
-            // Mostrar o nome do arquivo quando for anexado
-            const fileUploader = document.querySelector('.stFileUploader');
-            if (fileUploader) {
-                const observer = new MutationObserver(function(mutations) {
-                    mutations.forEach(function(mutation) {
-                        if (mutation.type === 'childList' && mutation.addedNodes.length) {
-                            const fileInfo = fileUploader.querySelector('.uploadedFileName');
-                            if (fileInfo) {
-                                const fileName = fileInfo.textContent.trim();
-                                // Adicionando uma mensagem ao lado do input
-                                const inputContainer = document.querySelector('.input-container');
-                                let fileStatus = document.querySelector('.file-attached');
-                                
-                                if (!fileStatus) {
-                                    fileStatus = document.createElement('div');
-                                    fileStatus.className = 'file-attached';
-                                    inputContainer.insertBefore(fileStatus, inputContainer.firstChild);
-                                }
-                                
-                                fileStatus.innerHTML = '<i class="fas fa-paperclip"></i> ' + fileName;
-                            }
-                        }
-                    });
-                });
-                
-                observer.observe(fileUploader, { childList: true, subtree: true });
-            }
+
         }, 1000); // Pequeno atraso para garantir que os elementos foram carregados
     });
     </script>
     """
     st.components.v1.html(js_code, height=0)
+
+
+
+#     st.components.v1.html("""
+# <script>
+# document.addEventListener('DOMContentLoaded', function () {
+#     const observer = new MutationObserver(() => {
+#         const textarea = document.querySelector('textarea');
+#         const sendButton = document.querySelector('button[data-testid="stBaseButton-secondary"]');
+#         console.log('asdasd',textarea, sendButton);
+
+#         if (textarea && sendButton) {
+#             textarea.addEventListener('keydown', function (e) {
+#                 if (e.key === 'Enter' && !e.shiftKey) {
+#                     e.preventDefault();
+#                     sendButton.click();
+#                 }
+#             });
+
+#             observer.disconnect();
+#         }
+#     });
+
+#     const body = document.body;
+#     if (body) {
+#         observer.observe(body, { childList: true, subtree: true });
+#     } else {
+#         console.error("document.body não está disponível.");
+#     }
+# });
+# </script>
+# """, height=0)
 
 def extract_title_from_response(response_text):
     """
