@@ -198,7 +198,7 @@ def invoke_bedrock_model(prompt, inference_profile_arn, model_params=None):
         "temperature": 0.6,
         "top_p": 0.8,
         "top_k": 50,
-        "max_tokens": 800
+        "max_tokens": 1800
         }
         
 

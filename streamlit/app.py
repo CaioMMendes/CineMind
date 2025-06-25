@@ -78,7 +78,7 @@ def query_bedrock(message, session_id="", model_params=None, context="", convers
             "temperature": 0.6,
             "top_p": 0.8,
             "top_k": 50,
-            "max_tokens": 800,
+            "max_tokens": 1800,
             "response_format": {"type": "text"}
         }
 
